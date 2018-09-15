@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<title>Document</title>
+	<style>
+		* {
+			margin: 0;
+			padding: 0;
+		}
+		#map {
+			width: 800px;
+			height: 600px;
+			background-color: #ccc;
+			position: relative;
+		}
+		#map div {
+			position: absolute;
+		}
+	</style>
+</head>
+<body>
+	<h1 id="score">当前分数为：0</h1>
+	<div id="map"></div>
+
+	<script>
+		// 通过功能演示，总体可以分为4个部分
+		// 1 地图
+		// 2 食物
+		// 3 小蛇
+		// 4 游戏控制器
+
+
+		// 下面是食物部分的功能：
+		(function () {
+			// 立即执行函数：用于将多个独立的功能部分分别保存。
+			function Food (options) {
+				this.width = options.width || 20;
+				this.height = options.height || 20;
+				this.bgColor = options.bgColor || 'green';
+				this.map = options.map;
+			}
+			// 设置初始化结构的方法：
+			Food.prototype.init = function () {
+				if (this.element) {
+					this.map.removeChild(this.element);
+				}
+
+				// 根据对应的属性，创建一个div放入到map中即可
+				var div = document.createElement('div');
+				this.element = div;
+				div.style.width = this.width + 'px';
+				div.style.height = this.height + 'px';
+				div.style.backgroundColor = this.bgColor;
+				this.map.appendChild(div);
+
+				// 通过观察我们发现，每次创建元素后均需要随机位置，就可以在这个方法中进行调用
+				this.randomPos();
+			};
+			// 计算随机的位置：
+			Food.prototype.randomPos = function () {
+				this.x = Math.floor(Math.random() * (this.map.offsetWidth / this.width));
+				this.y = Math.floor(Math.random() * (this.map.offsetHeight / this.height));
+
+				// 根据随机的坐标，计算出对应的left与top，设置给元素即可
+				this.element.style.left = this.x * this.width + 'px';
+				this.element.style.top = this.y * this.height + 'px';
+			};
+
+			// 由于本功能中的Food构造函数需要被外界访问
+			window.Food = Food;
+		})();
+		
+		// 下面是小蛇部分的功能:
+		(function () {
+			// 功能分析：
+			// 1 初始化小蛇的结构
+			// 2 设置小蛇的运动功能
+
+			function Snake (options) {
+				// 需要的属性：宽、高、颜色、坐标、放置位置。
+				this.width = options.width || 20;
+				this.height = options.height || 20;
+				// 初始化的时候，小蛇具有三个蛇身，并且蛇身的坐标以及颜色不同，需要分别设置
+				this.body = [
+					{x : 1, y : 1, bgColor : 'orange'},
+					{x : 2, y : 1, bgColor : 'orange'},
+					{x : 3, y : 1, bgColor : 'red'}
+				];
+				this.map = options.map;
+				// 直接将elements属性设置为数组结构，防止第一次调用init出现报错
+				this.elements = [];
+				// --- 大后期添加：用于保存小蛇的运动方向，默认为向右运动
+				this.dir = 'right';
+			}
+			// 设置初始化功能:
+			Snake.prototype.init = function () {
+				// --- 在绘制新的小蛇之前，先移除旧的小蛇结构
+				for (var i = 0; i < this.elements.length; i++) {
+					this.map.removeChild(this.elements[i]);
+				}
+				// --- 将已经从页面中移除的元素清空掉(从数组中清空)
+				this.elements = [];
+
+				// 根据this.body中的数据创建三个初始蛇身结构
+				var body = this.body;
+				for (var i = 0; i < body.length; i++) {
+					var div = document.createElement('div');
+					this.elements.push(div);
+					// 设置样式：
+					div.style.width = this.width + 'px';
+					div.style.height = this.height + 'px';
+					div.style.backgroundColor = body[i].bgColor;
+					div.style.left = body[i].x * this.width + 'px';
+					div.style.top = body[i].y * this.height + 'px';
+					this.map.appendChild(div);
+				}
+			};
+			// 设置小蛇的运动功能：(单步运动效果)
+			Snake.prototype.move = function () {
+				// 通过观察我们发现，除了蛇头以外，其余的蛇身均使用的是前面一个蛇身的上一次显示位置
+				var body = this.body;
+				for (var i = 0; i < body.length - 1; i++) {
+					body[i].x = body[i + 1].x;
+					body[i].y = body[i + 1].y;
+				}
+
+				// 设置蛇头坐标：默认向右运动
+				// 根据小蛇的运动方向dir属性值，设置蛇头的运动方式
+				switch (this.dir) {
+					case 'right':
+						body[body.length - 1].x++;
+						break;
+					case 'left':
+						body[body.length - 1].x--;
+						break;
+					case 'up':
+						body[body.length - 1].y--;
+						break;
+					case 'down':
+						body[body.length - 1].y++;
+						break;
+				}
+			};
+			window.Snake = Snake;
+		})();
+
+		// 下面是游戏控制部分的功能：
+		(function () {
+			// 游戏功能所需要的内容：食物，小蛇，地图
+			function Game (map2, score2) {
+				this.score = score2;
+				// 对于某个单独的游戏控制器来说，小蛇和食物和地图都是单独的一个
+				this.map = map2;
+				this.food = new Food({map : map2}); // 设置一个Food的实例对象
+				this.snake = new Snake({map : map2}); // 设置一个Snake的实例对象
+			}
+			// 设置游戏的初始化功能：
+			Game.prototype.start = function () {
+				// 1 绘制食物
+				this.food.init();
+				// 2 绘制小蛇
+				this.snake.init();
+				// 3 设置小蛇运动(持续的运动效果)
+				this.snakeRun();
+				// 4 设置按键操作，控制小蛇的运动方向
+				this.changeDir();
+			};
+			// 设置小蛇的运动功能：
+			Game.prototype.snakeRun = function () {
+				var snake = this.snake; // 小蛇
+				var food = this.food; // 食物
+				var count = 0; // 用于记录吃到的食物个数
+				var num = 0; // 用于记录当前分数
+				var score = this.score; // 显示分数的结构
+
+				var snakeHead = snake.body[snake.body.length - 1];
+				var timer = setInterval(function () {
+					// --- 后期添加：获取运动前的蛇尾坐标(旧的)
+					var sheWeiX = snake.body[0].x;
+					var sheWeiY = snake.body[0].y;
+
+					// 调用小蛇的move()和init()
+					snake.move(); // 改蛇坐标
+
+					// 在小蛇的运动过程中可能会吃到食物
+					//   判断方式：蛇头的坐标与食物的坐标相同
+					//	 操作方式：1 生成新的食物 2 添加一个蛇身的位置
+					if (food.x === snakeHead.x && food.y === snakeHead.y) {
+						food.init();
+						// 根据本次运动前的旧的蛇尾坐标，设置新的蛇尾坐标
+						// 将这个新的坐标对象放入到body属性中
+						snake.body.unshift({x : sheWeiX, y : sheWeiY, bgColor : 'green'});
+
+						// 分数功能：
+						count++;
+						if (count > 2) {
+							score.innerText = '当前分数为：' + (num += 20);	
+						} else {
+							score.innerText = '当前分数为：' + (num += 10);
+						}
+					}
+
+
+					// 检测是否游戏结束:
+					//  1 撞墙游戏结束:需要检测蛇头与坐标边界的关系
+					if (snakeHead.x < 0 || snakeHead.y < 0 || snakeHead.x > this.map.offsetWidth / food.width - 1 || snakeHead.y > this.map.offsetHeight / food.height - 1) {
+						alert('游戏结束！');
+						// 清除定时器
+						clearInterval(timer);
+						return;
+					}
+					// 2 撞到蛇身后游戏结束：通过观察我们发现只有除前四个蛇身以外的其他蛇身才可能被撞到
+					for (var i = 0; i < snake.body.length - 4; i++) {
+						// 检测蛇身的某个部分与蛇头坐标是否一致
+						if (snake.body[i].x === snakeHead.x && snake.body[i].y === snakeHead.y) {
+							alert('游戏结束！');
+							// 清除定时器
+							clearInterval(timer);
+							return;
+						}
+					}
+
+					snake.init(); // 画小蛇
+
+				}, 100);
+			};
+			// 设置运动方向更改功能:
+
+			
+			Game.prototype.changeDir = function () {
+				var flag = true; // 如果变量值为true，表示事件功能可以触发
+				// 设置keydown事件，按下后立刻做出改变方向的操作
+				var that = this;
+				document.onkeydown = function (e) {
+					// 按键的功能是否触发，取决于flag的值
+					if (flag === false) {
+						return;
+					}
+					// 如果代码可以往if后面执行，说明flag为true，可以修改flag为false，限制下一次执行
+					flag = false;
+					// 希望xxx毫秒后可以再次点击
+					setTimeout(function () {
+						// 设置flag为true，可以再次触发事件效果
+						flag = true;
+					}, 100);
+
+					// 左37 上38 右39 下40 
+					switch (true) {
+						// 更改小蛇的运动方向为对应方向，同时检测，当前运动方向不能与点击的方向相反
+						case e.keyCode === 37 && that.snake.dir !== 'right': 
+							that.snake.dir = 'left';
+							break;
+						case e.keyCode === 38 && that.snake.dir !== 'down':
+							that.snake.dir = 'up';
+							break;
+						case e.keyCode === 39 && that.snake.dir !== 'left':
+							that.snake.dir = 'right';
+							break;
+						case e.keyCode === 40 && that.snake.dir !== 'up':
+							that.snake.dir = 'down';
+							break;
+					}
+				};
+			};
+			window.Game = Game;
+		})();
+
+		// 下面是效果演示：
+		var score1 = document.getElementById('score');
+		var map1 = document.getElementById('map');
+		var g1 = new Game(map1, score1);
+		g1.start();
+
+
+	</script>
+</body>
+</html>
